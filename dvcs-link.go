@@ -27,7 +27,7 @@ func main() {
 		end = args[2]
 	}
 
-	remoteUrl := bashExec("git remote -v | grep 'push' | awk '{ print $2 }'")
+	remoteUrl := bashExec("git remote -v | grep 'origin' | grep 'push' | awk '{ print $2 }'")
 
 	if strings.HasPrefix(remoteUrl, "git@") {
 		remoteUrl = "https://" + strings.Replace(strings.Split(remoteUrl, "@")[1], ":", "/", 1)

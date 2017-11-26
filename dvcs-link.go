@@ -2,11 +2,15 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
-	"log"
 	"strings"
 )
+
+func usage() string {
+	return "No file given."
+}
 
 func main() {
 	var file, start, end string
@@ -14,7 +18,8 @@ func main() {
 	args := os.Args[1:]
 	switch len(args) {
 	case 0:
-		fmt.Println("No file given.")
+		fmt.Println(usage())
+
 		return
 	case 1:
 		file = args[0]
@@ -27,31 +32,29 @@ func main() {
 		end = args[2]
 	}
 
-	remoteUrl := bashExec("git remote -v | grep 'origin' | grep 'push' | awk '{ print $2 }'")
+	remoteOriginUrl := bashExec("git remote -v | grep 'origin.*push' | awk '{ print $2 }'")
 
-	if strings.HasPrefix(remoteUrl, "git@") {
-		remoteUrl = "https://" + strings.Replace(strings.Split(remoteUrl, "@")[1], ":", "/", 1)
-	}
+	remoteOriginUrl = convertToHttps(remoteOriginUrl)
 
 	commit := bashExec("git rev-parse HEAD")
 
-	githubUrl := strings.Join([]string {remoteUrl, "blob", commit, file}, "/")
+	dvcsLink := strings.Join([]string{remoteOriginUrl, "blob", commit, file}, "/")
 
 	if start != "" {
-		githubUrl = githubUrl + fmt.Sprintf("#L%v", start)
-	}
-	
-	if end != "" {
-		githubUrl = githubUrl + fmt.Sprintf("-L%v", end)
+		dvcsLink = dvcsLink + fmt.Sprintf("#L%v", start)
+
+		if end != "" {
+			dvcsLink = dvcsLink + fmt.Sprintf("-L%v", end)
+		}
 	}
 
-	fmt.Println(githubUrl)
+	fmt.Println(dvcsLink)
 }
 
 func bashExec(command string) string {
 	remoteCommand := exec.Command("bash", "-c", command)
 
-	if path, err := exec.LookPath("bash"); err != nil {  
+	if path, err := exec.LookPath("bash"); err != nil {
 		fmt.Println("[bashExec] binary not in path")
 		log.Fatal(err)
 	} else {
@@ -67,4 +70,16 @@ func bashExec(command string) string {
 	}
 
 	return remote
+}
+
+func convertToHttps(remoteOriginUrl string) string {
+	if strings.HasPrefix(remoteOriginUrl, "https") {
+		return remoteOriginUrl
+	}
+
+	res := strings.Split(remoteOriginUrl, "@")[1]
+	res = strings.Replace(res, ":", "/", 1)
+	res = strings.Replace(res, ".git", "", 1)
+
+	return "https://" + res
 }

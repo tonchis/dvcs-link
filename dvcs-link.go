@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -8,47 +9,48 @@ import (
 	"strings"
 )
 
-func usage() string {
-	return "No file given."
-}
-
 func main() {
-	var file, start, end string
+	var host, file, start, end string
 
-	args := os.Args[1:]
+	flag.StringVar(&host, "host", "", "DVCS host: `github` or `gitlab`")
+	flag.Parse()
+
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, `%[1]s is a tool to print the GitHub or GitLab link of a file and range.
+
+Usage:
+
+	$ %[1]s foo.go
+	https://github.com/user/repo/blob/commit/foo.go
+	
+	$ %[1]s foo.go 5
+	https://github.com/user/repo/blob/commit/foo.go#L5
+	
+	$ %[1]s foo.go 5 10
+	https://github.com/user/repo/blob/commit/foo.go#L5-L10
+	
+	$ %[1]s -host gitlab foo.go 5 10
+	https://gitlab.com/user/repo/blob/commit/foo.go#L5-L10
+`, os.Args[0])
+	}
+
+	args := flag.Args()
 	switch len(args) {
-	case 0:
-		fmt.Println(usage())
-
-		return
 	case 1:
 		file = args[0]
 	case 2:
 		file = args[0]
 		start = args[1]
-	default:
+	case 3:
 		file = args[0]
 		start = args[1]
 		end = args[2]
+	default:
+		flag.Usage()
+		os.Exit(1)
 	}
 
-	remoteOriginUrl := bashExec("git remote -v | grep 'origin.*push' | awk '{ print $2 }'")
-
-	remoteOriginUrl = convertToHttps(remoteOriginUrl)
-
-	commit := bashExec("git rev-parse HEAD")
-
-	dvcsLink := strings.Join([]string{remoteOriginUrl, "blob", commit, file}, "/")
-
-	if start != "" {
-		dvcsLink = dvcsLink + fmt.Sprintf("#L%v", start)
-
-		if end != "" {
-			dvcsLink = dvcsLink + fmt.Sprintf("-L%v", end)
-		}
-	}
-
-	fmt.Println(dvcsLink)
+	fmt.Println(resolveLink(host, file, start, end))
 }
 
 func bashExec(command string) string {
@@ -82,4 +84,28 @@ func convertToHttps(remoteOriginUrl string) string {
 	res = strings.Replace(res, ".git", "", 1)
 
 	return "https://" + res
+}
+
+func resolveLink(host string, file string, start string, end string) string {
+	var remoteOriginUrl string
+	if host == "" {
+		remoteOriginUrl = bashExec("git config --local --get remote.origin.url")
+		remoteOriginUrl = convertToHttps(remoteOriginUrl)
+	} else {
+		remoteOriginUrl = fmt.Sprintf("https://%v.com", host)
+	}
+
+	commit := bashExec("git rev-parse HEAD")
+
+	dvcsLink := strings.Join([]string{remoteOriginUrl, "blob", commit, file}, "/")
+
+	if start != "" {
+		dvcsLink = dvcsLink + fmt.Sprintf("#L%v", start)
+
+		if end != "" {
+			dvcsLink = dvcsLink + fmt.Sprintf("-L%v", end)
+		}
+	}
+
+	return dvcsLink
 }

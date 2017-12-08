@@ -60,6 +60,46 @@ Usage:
 	fmt.Println(resolveLink(host, file, start, end))
 }
 
+func verifyHost(host string) (string, error) {
+	if host == "" {
+		host = bashExec("git config --local --get remote.origin.url")
+	}
+
+	if !(strings.Contains(host, "github") || strings.Contains(host, "gitlab")) {
+		return "", errors.New("Unsupported host. Only `github` or `gitlab` are supported.")
+	}
+
+	return "", nil
+}
+
+func resolveLink(host string, file string, start string, end string) string {
+	hostUrl := resolveHost(host)
+
+	commit := bashExec("git rev-parse HEAD")
+
+	link := strings.Join([]string{hostUrl, "blob", commit, file}, "/")
+
+	if start != "" {
+		link = link + fmt.Sprintf("#L%v", start)
+
+		link = resolveRange(link, end)
+	}
+
+	return link
+}
+
+func resolveHost(host string) string {
+	remoteOriginUrl := bashExec("git config --local --get remote.origin.url")
+	remoteOriginUrl = normalizeUrl(remoteOriginUrl)
+
+	if host != "" {
+		hostAndPath := strings.SplitN(remoteOriginUrl, "/", 2)
+		remoteOriginUrl = fmt.Sprintf("%v.com/%v", host, hostAndPath[1])
+	}
+
+	return "https://" + remoteOriginUrl
+}
+
 func bashExec(command string) string {
 	remoteCommand := exec.Command("bash", "-c", command)
 
@@ -106,40 +146,4 @@ func resolveRange(link string, end string) string {
 	}
 
 	return link + fmt.Sprintf("-%v", suffix)
-}
-
-func resolveLink(host string, file string, start string, end string) string {
-	remoteOriginUrl := bashExec("git config --local --get remote.origin.url")
-	remoteOriginUrl = normalizeUrl(remoteOriginUrl)
-
-	if host != "" {
-		hostAndPath := strings.SplitN(remoteOriginUrl, "/", 2)
-		remoteOriginUrl = fmt.Sprintf("%v.com/%v", host, hostAndPath[1])
-	}
-
-	remoteOriginUrl = "https://" + remoteOriginUrl
-
-	commit := bashExec("git rev-parse HEAD")
-
-	link := strings.Join([]string{remoteOriginUrl, "blob", commit, file}, "/")
-
-	if start != "" {
-		link = link + fmt.Sprintf("#L%v", start)
-
-		link = resolveRange(link, end)
-	}
-
-	return link
-}
-
-func verifyHost(host string) (string, error) {
-	if host == "" {
-		host = bashExec("git config --local --get remote.origin.url")
-	}
-
-	if !(strings.Contains(host, "github") || strings.Contains(host, "gitlab")) {
-		return "", errors.New("Unsupported host. Only `github` or `gitlab` are supported.")
-	}
-
-	return "", nil
 }

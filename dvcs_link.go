@@ -74,26 +74,28 @@ func bashExec(command string) string {
 	return remote
 }
 
-func convertToHttps(remoteOriginUrl string) string {
+func normalizeUrl(remoteOriginUrl string) string {
 	if strings.HasPrefix(remoteOriginUrl, "https") {
-		return remoteOriginUrl
+		return strings.Replace(remoteOriginUrl, "https://", "", 1)
 	}
 
 	res := strings.Split(remoteOriginUrl, "@")[1]
 	res = strings.Replace(res, ":", "/", 1)
 	res = strings.Replace(res, ".git", "", 1)
 
-	return "https://" + res
+	return res
 }
 
 func resolveLink(host string, file string, start string, end string) string {
-	var remoteOriginUrl string
-	if host == "" {
-		remoteOriginUrl = bashExec("git config --local --get remote.origin.url")
-		remoteOriginUrl = convertToHttps(remoteOriginUrl)
-	} else {
-		remoteOriginUrl = fmt.Sprintf("https://%v.com", host)
+	remoteOriginUrl := bashExec("git config --local --get remote.origin.url")
+	remoteOriginUrl = normalizeUrl(remoteOriginUrl)
+
+	if host != "" {
+		hostAndPath := strings.SplitN(remoteOriginUrl, "/", 2)
+		remoteOriginUrl = fmt.Sprintf("%v.com/%v", host, hostAndPath[1])
 	}
+
+	remoteOriginUrl = "https://" + remoteOriginUrl
 
 	commit := bashExec("git rev-parse HEAD")
 

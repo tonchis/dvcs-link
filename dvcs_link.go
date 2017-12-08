@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -47,6 +48,12 @@ Usage:
 		end = args[2]
 	default:
 		flag.Usage()
+		os.Exit(1)
+	}
+
+	_, err := verifyHost(host)
+	if err != nil {
+		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 
@@ -125,10 +132,14 @@ func resolveLink(host string, file string, start string, end string) string {
 	return link
 }
 
-		if end != "" {
-			dvcsLink = dvcsLink + fmt.Sprintf("-L%v", end)
-		}
+func verifyHost(host string) (string, error) {
+	if host == "" {
+		host = bashExec("git config --local --get remote.origin.url")
 	}
 
-	return dvcsLink
+	if !(strings.Contains(host, "github") || strings.Contains(host, "gitlab")) {
+		return "", errors.New("Unsupported host. Only `github` or `gitlab` are supported.")
+	}
+
+	return "", nil
 }

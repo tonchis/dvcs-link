@@ -54,3 +54,20 @@ func TestWithHost(t *testing.T) {
 		t.Errorf("Expected %v to equal %v", link, expectedLink)
 	}
 }
+
+func TestUnsupportedHost(t *testing.T) {
+	_, err := verifyHost("github")
+	if err != nil {
+		t.Error("Expected to support github.")
+	}
+
+	_, err = verifyHost("gitlab")
+	if err != nil {
+		t.Error("Expected to support gitlab.")
+	}
+
+	_, err = verifyHost("bitbucket")
+	if err == nil {
+		t.Error("Unexpected bitbucket support.")
+	}
+}

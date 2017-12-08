@@ -86,6 +86,21 @@ func normalizeUrl(remoteOriginUrl string) string {
 	return res
 }
 
+func resolveRange(link string, end string) string {
+	if end == "" {
+		return link
+	}
+
+	var suffix string
+	if strings.Contains(link, "github") {
+		suffix = "L" + end
+	} else if strings.Contains(link, "gitlab") {
+		suffix = end
+	}
+
+	return link + fmt.Sprintf("-%v", suffix)
+}
+
 func resolveLink(host string, file string, start string, end string) string {
 	remoteOriginUrl := bashExec("git config --local --get remote.origin.url")
 	remoteOriginUrl = normalizeUrl(remoteOriginUrl)
@@ -99,10 +114,16 @@ func resolveLink(host string, file string, start string, end string) string {
 
 	commit := bashExec("git rev-parse HEAD")
 
-	dvcsLink := strings.Join([]string{remoteOriginUrl, "blob", commit, file}, "/")
+	link := strings.Join([]string{remoteOriginUrl, "blob", commit, file}, "/")
 
 	if start != "" {
-		dvcsLink = dvcsLink + fmt.Sprintf("#L%v", start)
+		link = link + fmt.Sprintf("#L%v", start)
+
+		link = resolveRange(link, end)
+	}
+
+	return link
+}
 
 		if end != "" {
 			dvcsLink = dvcsLink + fmt.Sprintf("-L%v", end)

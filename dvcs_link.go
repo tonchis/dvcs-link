@@ -11,9 +11,9 @@ import (
 )
 
 func main() {
-	var host, file, start, end string
+	var remote, file, start, end string
 
-	flag.StringVar(&host, "host", "", "DVCS host: `github` or `gitlab`")
+	flag.StringVar(&remote, "remote", "origin", "Name of the remote repository. Default 'origin'.")
 	flag.Parse()
 
 	flag.Usage = func() {
@@ -30,7 +30,7 @@ Usage:
 	$ %[1]s foo.go 5 10
 	https://github.com/user/repo/blob/commit/foo.go#L5-L10
 	
-	$ %[1]s -host gitlab foo.go 5 10
+	$ %[1]s -remote mirror foo.go 5 10
 	https://gitlab.com/user/repo/blob/commit/foo.go#L5-L10
 `, os.Args[0])
 	}
@@ -51,29 +51,27 @@ Usage:
 		os.Exit(1)
 	}
 
-	_, err := verifyHost(host)
+	err := verifyHost(remote)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 
-	fmt.Println(resolveLink(host, file, start, end))
+	fmt.Println(resolveLink(remote, file, start, end))
 }
 
-func verifyHost(host string) (string, error) {
-	if host == "" {
-		host = bashExec("git config --local --get remote.origin.url")
-	}
+func verifyHost(remote string) error {
+	host := bashExec(fmt.Sprintf("git config --local --get remote.%v.url", remote))
 
 	if !(strings.Contains(host, "github") || strings.Contains(host, "gitlab")) {
-		return "", errors.New("Unsupported host. Only `github` or `gitlab` are supported.")
+		return errors.New("Unsupported host. Only `github` or `gitlab` are supported.")
 	}
 
-	return "", nil
+	return nil
 }
 
-func resolveLink(host string, file string, start string, end string) string {
-	hostUrl := resolveHost(host)
+func resolveLink(remote string, file string, start string, end string) string {
+	hostUrl := resolveHost(remote)
 
 	commit := bashExec("git rev-parse HEAD")
 
@@ -88,16 +86,11 @@ func resolveLink(host string, file string, start string, end string) string {
 	return link
 }
 
-func resolveHost(host string) string {
-	remoteOriginUrl := bashExec("git config --local --get remote.origin.url")
-	remoteOriginUrl = normalizeUrl(remoteOriginUrl)
+func resolveHost(remote string) string {
+	remoteUrl := bashExec(fmt.Sprintf("git config --local --get remote.%v.url", remote))
+	remoteUrl = normalizeUrl(remoteUrl)
 
-	if host != "" {
-		hostAndPath := strings.SplitN(remoteOriginUrl, "/", 2)
-		remoteOriginUrl = fmt.Sprintf("%v.com/%v", host, hostAndPath[1])
-	}
-
-	return "https://" + remoteOriginUrl
+	return "https://" + remoteUrl
 }
 
 func bashExec(command string) string {
@@ -121,12 +114,12 @@ func bashExec(command string) string {
 	return remote
 }
 
-func normalizeUrl(remoteOriginUrl string) string {
-	if strings.HasPrefix(remoteOriginUrl, "https") {
-		return strings.Replace(remoteOriginUrl, "https://", "", 1)
+func normalizeUrl(remoteUrl string) string {
+	if strings.HasPrefix(remoteUrl, "https") {
+		return strings.Replace(remoteUrl, "https://", "", 1)
 	}
 
-	res := strings.Split(remoteOriginUrl, "@")[1]
+	res := strings.Split(remoteUrl, "@")[1]
 	res = strings.Replace(res, ":", "/", 1)
 	res = strings.Replace(res, ".git", "", 1)
 

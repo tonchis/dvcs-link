@@ -5,8 +5,7 @@ import (
 	"testing"
 )
 
-type MockBash struct {
-}
+type MockBash struct{}
 
 func (m MockBash) Run(command string) string {
 	commandParts := strings.SplitN(command, " ", 3)

@@ -14,8 +14,7 @@ type Shell interface {
 	Run(command string) string
 }
 
-type Bash struct {
-}
+type Bash struct{}
 
 func (b Bash) Run(command string) string {
 	remoteCommand := exec.Command("bash", "-c", command)

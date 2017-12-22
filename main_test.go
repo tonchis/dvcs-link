@@ -1,14 +1,42 @@
 package main
 
 import (
-	"fmt"
+	"strings"
 	"testing"
 )
 
+type MockBash struct {
+}
+
+func (m MockBash) Run(command string) string {
+	commandParts := strings.SplitN(command, " ", 3)
+	gitCommand := commandParts[1]
+	gitArgs := commandParts[2]
+
+	switch gitCommand {
+	case "rev-parse":
+		return "commit-sha"
+	case "config":
+		if strings.Contains(gitArgs, "origin") || strings.Contains(gitArgs, "gitlab") {
+			return "git@gitlab.com:tonchis/dvcs-link"
+		} else if strings.Contains(gitArgs, "github") {
+			return "git@github.com:tonchis/dvcs-link.git"
+		} else {
+			return "https://usersname@bitbucket.org/username/reponame.git"
+		}
+	}
+
+	return ""
+}
+
+func TestMain(m *testing.M) {
+	bashExec = MockBash{}.Run
+	m.Run()
+}
+
 func TestFilenameOnly(t *testing.T) {
 	link := resolveLink("origin", "foo.go", "", "")
-	commit := bashExec("git rev-parse HEAD")
-	expectedLink := fmt.Sprintf("https://gitlab.com/tonchis/dvcs-link/blob/%v/foo.go", commit)
+	expectedLink := "https://gitlab.com/tonchis/dvcs-link/blob/commit-sha/foo.go"
 
 	if link != expectedLink {
 		t.Errorf("Expected %v to equal %v", link, expectedLink)
@@ -16,9 +44,8 @@ func TestFilenameOnly(t *testing.T) {
 }
 
 func TestWithLine(t *testing.T) {
-	link := resolveLink("origin", "foo.go", "5", "")
-	commit := bashExec("git rev-parse HEAD")
-	expectedLink := fmt.Sprintf("https://gitlab.com/tonchis/dvcs-link/blob/%v/foo.go#L5", commit)
+	link := resolveLink("origin", "foo.go", "6", "")
+	expectedLink := "https://gitlab.com/tonchis/dvcs-link/blob/commit-sha/foo.go#L6"
 
 	if link != expectedLink {
 		t.Errorf("Expected %v to equal %v", link, expectedLink)
@@ -27,50 +54,35 @@ func TestWithLine(t *testing.T) {
 
 func TestWithGitLabRange(t *testing.T) {
 	link := resolveLink("origin", "foo.go", "5", "10")
-	commit := bashExec("git rev-parse HEAD")
-	expectedLink := fmt.Sprintf("https://gitlab.com/tonchis/dvcs-link/blob/%v/foo.go#L5-10", commit)
+	expectedLink := "https://gitlab.com/tonchis/dvcs-link/blob/commit-sha/foo.go#L5-10"
 
 	if link != expectedLink {
 		t.Errorf("Expected %v to equal %v", link, expectedLink)
 	}
 }
 
-// TODO: to make the tests below work again I need to mock the `git config` call
-// to return a string with the corresponding URL.
+func TestWithGitHubRange(t *testing.T) {
+	link := resolveLink("github", "foo.go", "5", "10")
+	expectedLink := "https://github.com/tonchis/dvcs-link/blob/commit-sha/foo.go#L5-L10"
 
-// func TestWithGitHubRange(t *testing.T) {
-// 	link := resolveLink("github", "foo.go", "5", "10")
-// 	commit := bashExec("git rev-parse HEAD")
-// 	expectedLink := fmt.Sprintf("https://github.com/tonchis/dvcs-link/blob/%v/foo.go#L5-L10", commit)
+	if link != expectedLink {
+		t.Errorf("Expected %v to equal %v", link, expectedLink)
+	}
+}
 
-// 	if link != expectedLink {
-// 		t.Errorf("Expected %v to equal %v", link, expectedLink)
-// 	}
-// }
+func TestUnsupportedHost(t *testing.T) {
+	err := verifyHost("github")
+	if err != nil {
+		t.Error("Expected to support github.")
+	}
 
-// func TestWithHost(t *testing.T) {
-// 	link := resolveLink("github", "foo.go", "5", "10")
-// 	commit := bashExec("git rev-parse HEAD")
-// 	expectedLink := fmt.Sprintf("https://github.com/tonchis/dvcs-link/blob/%v/foo.go#L5-L10", commit)
+	err = verifyHost("gitlab")
+	if err != nil {
+		t.Error("Expected to support gitlab.")
+	}
 
-// 	if link != expectedLink {
-// 		t.Errorf("Expected %v to equal %v", link, expectedLink)
-// 	}
-// }
-
-// func TestUnsupportedHost(t *testing.T) {
-// 	err := verifyHost("github")
-// 	if err != nil {
-// 		t.Error("Expected to support github.")
-// 	}
-
-// 	err = verifyHost("gitlab")
-// 	if err != nil {
-// 		t.Error("Expected to support gitlab.")
-// 	}
-
-// 	err = verifyHost("bitbucket")
-// 	if err == nil {
-// 		t.Error("Unexpected bitbucket support.")
-// 	}
-// }
+	err = verifyHost("bitbucket")
+	if err == nil {
+		t.Error("Unexpected bitbucket support.")
+	}
+}

@@ -10,6 +10,36 @@ import (
 	"strings"
 )
 
+type Shell interface {
+	Run(command string) string
+}
+
+type Bash struct {
+}
+
+func (b Bash) Run(command string) string {
+	remoteCommand := exec.Command("bash", "-c", command)
+
+	if path, err := exec.LookPath("bash"); err != nil {
+		fmt.Println("[bashExec] binary not in path")
+		log.Fatal(err)
+	} else {
+		remoteCommand.Path = string(path)
+	}
+
+	var remote string
+	if output, err := remoteCommand.Output(); err != nil {
+		fmt.Println("[bashExec] command execution failed")
+		log.Fatal(err)
+	} else {
+		remote = strings.TrimSpace(string(output))
+	}
+
+	return remote
+}
+
+var bashExec = Bash{}.Run
+
 func main() {
 	var remote, file, start, end string
 
@@ -91,27 +121,6 @@ func resolveHost(remote string) string {
 	remoteUrl = normalizeUrl(remoteUrl)
 
 	return "https://" + remoteUrl
-}
-
-func bashExec(command string) string {
-	remoteCommand := exec.Command("bash", "-c", command)
-
-	if path, err := exec.LookPath("bash"); err != nil {
-		fmt.Println("[bashExec] binary not in path")
-		log.Fatal(err)
-	} else {
-		remoteCommand.Path = string(path)
-	}
-
-	var remote string
-	if output, err := remoteCommand.Output(); err != nil {
-		fmt.Println("[bashExec] command execution failed")
-		log.Fatal(err)
-	} else {
-		remote = strings.TrimSpace(string(output))
-	}
-
-	return remote
 }
 
 func normalizeUrl(remoteUrl string) string {
